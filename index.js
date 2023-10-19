@@ -14,10 +14,11 @@ const STATE = {
     WAIT: 6,
     STOP: 7,
     RECO: 8,
-    GETM: 9
+    GETM: 9,
+    CLOS: 10
 };
 
-const SERVICE  = 'http://games.dtco.ru';
+const SERVICE  = 'https://games.dtco.ru';
 const USERNAME = 'garbo';
 const PASSWORD = 'garbo';
 
@@ -159,8 +160,12 @@ let getConfirmed = function(app) {
         headers: { Authorization: `Bearer ${TOKEN}` }
     })
     .then(function (response) {
-//      console.log(response.data);
-        app.state = STATE.MOVE;
+        if ((response.data.length > 0) && response.data[0].result_id) {
+            console.log(response.data);
+            app.state = STATE.CLOS;
+        } else {
+            app.state = STATE.MOVE;
+        }
     })
     .catch(function (error) {
         console.log('GETM ERROR: ' + error);
@@ -168,6 +173,23 @@ let getConfirmed = function(app) {
         app.state  = STATE.INIT;
     });
     return true;
+}
+
+let closeSession = function(app) {
+    console.log('CLOS');
+    app.state = STATE.WAIT;
+    axios.post(SERVICE + '/api/session/close', {
+        id: sid
+    }, {
+        headers: { Authorization: `Bearer ${TOKEN}` }
+    }).then(function (response) {
+        app.state = STATE.CHCK;
+    }).catch(function (error) {
+      console.log('TURN ERROR: ' + error);
+        logger.error('TURN ERROR: ' + error);
+        app.state  = STATE.INIT;
+      });
+      return true;
 }
 
 let checkTurn = function(app) {
@@ -178,14 +200,13 @@ let checkTurn = function(app) {
     })
     .then(function (response) {
         if (response.data.length > 0) {
-//          console.log(response.data);
             sid = response.data[0].id;
             setup = response.data[0].last_setup;
             if (!setup) {
                 setup = '?turn=0;&setup=rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w kqKQ - 0 1';
             }
             app.state = STATE.RECO;
-        } else {
+    } else {
             app.state = STATE.CHCK;
         }
       })
@@ -522,6 +543,7 @@ app.states[STATE.SESS] = addSess;
 app.states[STATE.RECO] = recovery;
 app.states[STATE.GETM] = getConfirmed;
 app.states[STATE.STRT] = loadDebuts;
+app.states[STATE.CLOS] = closeSession;
 
 let run = function() {
     if (app.exec()) {
