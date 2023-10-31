@@ -35,6 +35,7 @@ let turn    = null;
 let debuts  = [];
 let mines   = null;
 let timeout = null;
+let last    = null;
 
 let variant  = 31;
 let ai_flags = 0x20 | 0x40 | 0x80 | 0x2 | 0x4 | 0x8;
@@ -143,6 +144,7 @@ let recovery = function(app) {
         if (!height) {
             height = 8;
         }
+//      last = response.data.last_turn;
         app.state = STATE.GETM;
       })
       .catch(function (error) {
@@ -164,6 +166,7 @@ let getConfirmed = function(app) {
             console.log(response.data);
             app.state = STATE.CLOS;
         } else {
+//          last = response.data[0].turn_num;
             app.state = STATE.MOVE;
         }
     })
@@ -205,8 +208,9 @@ let checkTurn = function(app) {
             if (!setup) {
                 setup = '?turn=0;&setup=rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w kqKQ - 0 1';
             }
+            last = response.data[0].last_turn;
             app.state = STATE.RECO;
-    } else {
+        } else {
             app.state = STATE.CHCK;
         }
       })
@@ -353,11 +357,17 @@ function FinishTurnCallback(bestMove, fen, value, time, ply) {
             fen = encodeFen(board, [], d.width);
             mines = null;
         }
+        let tn = null;
+        if (last !== null) {
+            last++;
+            tn = last;
+        }
         axios.post(SERVICE + '/api/move', {
             uid: uid,
             next_player: (turn == 0) ? 2 : 1,
             move_str: move,
             setup_str: getSetup(fen),
+            turn_num: tn,
             note: 'time=' + time + ', value=' + value + ', ply=' + ply
         }, {
             headers: { Authorization: `Bearer ${TOKEN}` }
@@ -432,11 +442,17 @@ let sendMove = function(app) {
                 let s = getSetup(f);
 //              console.log('s = ' + s);
                 app.state  = STATE.WAIT;
+                let tn = null;
+                if (last !== null) {
+                    last++;
+                    tn = last;
+                }
                 axios.post(SERVICE + '/api/move', {
                     uid: uid,
                     next_player: (turn == 0) ? 2 : 1,
                     move_str: move,
-                    setup_str: s
+                    setup_str: s,
+                    turn_num: tn
                 }, {
                     headers: { Authorization: `Bearer ${TOKEN}` }
                 })
